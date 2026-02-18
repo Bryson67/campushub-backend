@@ -1,0 +1,157 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+const server_1 = require("convex/server");
+const values_1 = require("convex/values");
+exports.default = (0, server_1.defineSchema)({
+    users: (0, server_1.defineTable)({
+        email: values_1.v.string(),
+        password: values_1.v.string(),
+        username: values_1.v.string(),
+        gamerTag: values_1.v.string(),
+        balance: values_1.v.number(),
+        wins: values_1.v.number(),
+        tournamentsPlayed: values_1.v.number(),
+        games: values_1.v.array(values_1.v.string()),
+        profileImage: values_1.v.optional(values_1.v.id("_storage")),
+        selectedGames: values_1.v.optional(values_1.v.array(values_1.v.string())),
+        createdAt: values_1.v.number(),
+        totalEarnings: values_1.v.optional(values_1.v.number()), // Add this line
+        bestGame: values_1.v.optional(values_1.v.string()),
+        winRate: values_1.v.optional(values_1.v.number()),
+    }).index("by_email", ["email"]),
+    tournaments: (0, server_1.defineTable)({
+        name: values_1.v.string(),
+        game: values_1.v.string(),
+        date: values_1.v.string(),
+        fee: values_1.v.number(),
+        status: values_1.v.optional(values_1.v.string()),
+        bracketType: values_1.v.optional(values_1.v.string()),
+        maxPlayers: values_1.v.optional(values_1.v.number()),
+        allowSpectators: values_1.v.optional(values_1.v.boolean()),
+        maxSpectators: values_1.v.optional(values_1.v.number()),
+        // Winner tracking fields
+        winnerId: values_1.v.optional(values_1.v.string()),
+        winnerName: values_1.v.optional(values_1.v.string()),
+        winnerPrize: values_1.v.optional(values_1.v.number()),
+        completedAt: values_1.v.optional(values_1.v.number()),
+    }),
+    players: (0, server_1.defineTable)({
+        id: values_1.v.string(),
+        userId: values_1.v.string(),
+        name: values_1.v.string(),
+        tournamentId: values_1.v.string(),
+        phoneNumber: values_1.v.string(),
+        amount: values_1.v.number(),
+        mpesaReceipt: values_1.v.string(),
+        createdAt: values_1.v.string(),
+        allowSpectate: values_1.v.optional(values_1.v.boolean()),
+        // Stats tracking fields
+        wins: values_1.v.optional(values_1.v.number()),
+        totalEarnings: values_1.v.optional(values_1.v.number()),
+        tournamentsPlayed: values_1.v.optional(values_1.v.number()),
+    }),
+    matches: (0, server_1.defineTable)({
+        tournamentId: values_1.v.string(),
+        round: values_1.v.number(),
+        matchNumber: values_1.v.number(),
+        player1Id: values_1.v.optional(values_1.v.string()),
+        player2Id: values_1.v.optional(values_1.v.string()),
+        player1Score: values_1.v.optional(values_1.v.number()),
+        player2Score: values_1.v.optional(values_1.v.number()),
+        player1Kills: values_1.v.optional(values_1.v.number()),
+        player2Kills: values_1.v.optional(values_1.v.number()),
+        player1Deaths: values_1.v.optional(values_1.v.number()),
+        player2Deaths: values_1.v.optional(values_1.v.number()),
+        player1Headshots: values_1.v.optional(values_1.v.number()),
+        player2Headshots: values_1.v.optional(values_1.v.number()),
+        winnerId: values_1.v.optional(values_1.v.string()),
+        winnerMethod: values_1.v.optional(values_1.v.string()),
+        status: values_1.v.string(),
+        nextMatchId: values_1.v.optional(values_1.v.id("matches")),
+        scheduledTime: values_1.v.optional(values_1.v.string()),
+        gameServerId: values_1.v.optional(values_1.v.string()),
+        streamUrl: values_1.v.optional(values_1.v.string()),
+        // Dual confirmation fields
+        player1Confirmed: values_1.v.optional(values_1.v.boolean()),
+        player2Confirmed: values_1.v.optional(values_1.v.boolean()),
+        player1ConfirmedAt: values_1.v.optional(values_1.v.number()),
+        player2ConfirmedAt: values_1.v.optional(values_1.v.number()),
+        proposedPlayer1Score: values_1.v.optional(values_1.v.number()),
+        proposedPlayer2Score: values_1.v.optional(values_1.v.number()),
+        proposedBy: values_1.v.optional(values_1.v.string()),
+        disputeReason: values_1.v.optional(values_1.v.string()),
+        // Proposed stats for shooter games
+        proposedPlayer1Kills: values_1.v.optional(values_1.v.number()),
+        proposedPlayer2Kills: values_1.v.optional(values_1.v.number()),
+        proposedPlayer1Deaths: values_1.v.optional(values_1.v.number()),
+        proposedPlayer2Deaths: values_1.v.optional(values_1.v.number()),
+        proposedPlayer1Headshots: values_1.v.optional(values_1.v.number()),
+        proposedPlayer2Headshots: values_1.v.optional(values_1.v.number()),
+        // Match completion fields
+        completedAt: values_1.v.optional(values_1.v.number()),
+        duration: values_1.v.optional(values_1.v.number()),
+    }).index("by_tournament", ["tournamentId", "round"]),
+    spectators: (0, server_1.defineTable)({
+        matchId: values_1.v.id("matches"),
+        userId: values_1.v.string(),
+        joinedAt: values_1.v.string(),
+        isActive: values_1.v.boolean(),
+    }).index("by_match", ["matchId"]),
+    gameServers: (0, server_1.defineTable)({
+        name: values_1.v.string(),
+        game: values_1.v.string(),
+        serverAddress: values_1.v.string(),
+        apiKey: values_1.v.string(),
+        maxSpectators: values_1.v.number(),
+        currentSpectators: values_1.v.number(),
+        status: values_1.v.string(),
+    }),
+    disputes: (0, server_1.defineTable)({
+        matchId: values_1.v.id("matches"),
+        reason: values_1.v.string(),
+        evidence: values_1.v.array(values_1.v.string()),
+        disputedScore: values_1.v.object({
+            player1Score: values_1.v.number(),
+            player2Score: values_1.v.number(),
+        }),
+        status: values_1.v.string(),
+        createdAt: values_1.v.number(),
+        resolvedBy: values_1.v.optional(values_1.v.string()),
+        resolvedAt: values_1.v.optional(values_1.v.number()),
+        resolution: values_1.v.optional(values_1.v.string()),
+    }),
+    winners: (0, server_1.defineTable)({
+        tournamentId: values_1.v.string(),
+        tournamentName: values_1.v.string(),
+        game: values_1.v.string(),
+        winnerId: values_1.v.string(),
+        winnerName: values_1.v.string(),
+        prize: values_1.v.number(),
+        date: values_1.v.string(),
+        matchesPlayed: values_1.v.number(),
+        kills: values_1.v.optional(values_1.v.number()),
+        deaths: values_1.v.optional(values_1.v.number()),
+        headshots: values_1.v.optional(values_1.v.number()),
+        averageScore: values_1.v.optional(values_1.v.number()),
+        winStreak: values_1.v.optional(values_1.v.number()),
+    })
+        .index("by_date", ["date"])
+        .index("by_game", ["game"]),
+    withdrawals: (0, server_1.defineTable)({
+        userId: values_1.v.string(),
+        userName: values_1.v.string(),
+        amount: values_1.v.number(),
+        phoneNumber: values_1.v.string(), // M-Pesa phone number
+        paymentMethod: values_1.v.string(), // 'mpesa', 'bank', etc.
+        status: values_1.v.string(), // 'pending', 'approved', 'rejected', 'completed'
+        tournamentId: values_1.v.optional(values_1.v.string()),
+        tournamentName: values_1.v.optional(values_1.v.string()),
+        requestedAt: values_1.v.number(),
+        processedAt: values_1.v.optional(values_1.v.number()),
+        processedBy: values_1.v.optional(values_1.v.string()),
+        transactionId: values_1.v.optional(values_1.v.string()), // M-Pesa transaction ID
+        notes: values_1.v.optional(values_1.v.string()),
+    })
+        .index("by_user", ["userId"])
+        .index("by_status", ["status"]),
+});

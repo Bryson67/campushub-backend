@@ -1,6 +1,5 @@
 import { ConvexHttpClient } from "convex/browser";
 import express from "express";
-import { api } from "../../../convex/_generated/api";
 
 const router = express.Router();
 const CONVEX_URL = "https://peaceful-aardvark-549.convex.cloud";
