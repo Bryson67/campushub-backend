@@ -1,7 +1,7 @@
 // backend/src/routes/payments.ts
 import { ConvexHttpClient } from "convex/browser";
 import express from "express";
-import { api } from "../../../convex/_generated/api";
+import { api } from "../../convex/_generated/api";
 import { stkPush } from "../mpesa";
 
 const router = express.Router();

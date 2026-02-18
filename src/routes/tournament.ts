@@ -1,5 +1,6 @@
 import { ConvexHttpClient } from "convex/browser";
 import express from "express";
+import { api } from "../../convex/_generated/api";
 
 const router = express.Router();
 const CONVEX_URL = "https://peaceful-aardvark-549.convex.cloud";
@@ -36,7 +37,8 @@ router.get("/lobby/:tournamentId", async (req, res) => {
     // Check if current user is registered
     let isUserRegistered = false;
     if (userId && players) {
-      isUserRegistered = players.some((p) => p.userId === userId);
+      const isRegistered = players.some((p: any) => p.userId === userId);
+      isUserRegistered = isRegistered;
     }
 
     res.json({
