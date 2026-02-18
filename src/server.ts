@@ -1,28 +1,18 @@
 import dotenv from "dotenv";
-import path from "path";
-
-// Load environment variables from .env file - do this FIRST
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
-
-// Log to verify CONVEX_URL is loaded (remove this in production)
-console.log(
-  "🔍 CONVEX_URL:",
-  process.env.CONVEX_URL ? "✅ Loaded" : "❌ Not loaded",
-);
-console.log(
-  "🔍 MPESA variables:",
-  process.env.MPESA_CONSUMER_KEY ? "✅ Loaded" : "❌ Not loaded",
-);
-
 import express from "express";
+import path from "path";
 import paymentsRouter from "./routes/payments";
-import tournamentsRouter from "./routes/tournament";
+import tournamentRouter from "./routes/tournament";
+
+// Load environment variables
+dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 app.use(express.json());
 
-// ✅ Add this health check endpoint - Railway will call this
+// ✅ Health check endpoint (must be at root level)
 app.get("/health", (req, res) => {
+  console.log("🏥 Health check called");
   res.status(200).json({
     status: "ok",
     timestamp: new Date().toISOString(),
@@ -30,11 +20,24 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Routes
+// Your routes
 app.use("/api", paymentsRouter);
-app.use("/api/tournament", tournamentsRouter);
+app.use("/api/tournaments", tournamentRouter);
 
-const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
-  console.log(`Server running on port ${PORT}`);
+// ✅ CRITICAL: Bind to 0.0.0.0 and use Railway's PORT
+const PORT = process.env.PORT ? parseInt(process.env.PORT) : 3000;
+const HOST = "0.0.0.0"; // This is essential for Railway
+
+const server = app.listen(PORT, HOST, () => {
+  console.log(`✅ Server running on http://${HOST}:${PORT}`);
+  console.log(`✅ Health check available at /health`);
+  console.log(`✅ Environment: ${process.env.NODE_ENV || "development"}`);
+});
+
+// Handle graceful shutdown
+process.on("SIGTERM", () => {
+  console.log("SIGTERM received, shutting down gracefully");
+  server.close(() => {
+    console.log("Server closed");
+  });
 });
