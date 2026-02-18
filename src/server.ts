@@ -21,6 +21,15 @@ import tournamentsRouter from "./routes/tournament";
 const app = express();
 app.use(express.json());
 
+// ✅ Add this health check endpoint - Railway will call this
+app.get("/health", (req, res) => {
+  res.status(200).json({
+    status: "ok",
+    timestamp: new Date().toISOString(),
+    service: "campushub-backend",
+  });
+});
+
 // Routes
 app.use("/api", paymentsRouter);
 app.use("/api/tournament", tournamentsRouter);

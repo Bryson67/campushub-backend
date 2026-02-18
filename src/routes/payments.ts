@@ -1,16 +1,17 @@
 // backend/src/routes/payments.ts
-import { ConvexHttpClient } from "convex/browser";
+
+import { ConvexHttpClient } from "convex/browser"; // Add this import
 import express from "express";
-import { api } from "../../convex/_generated/api";
 import { stkPush } from "../mpesa";
 
 const router = express.Router();
 
 // Initialize Convex HTTP client
-const CONVEX_URL = "https://peaceful-aardvark-549.convex.cloud"; // <-- PUT YOUR URL HERE
-console.log("🔧 Using hardcoded CONVEX_URL:", CONVEX_URL);
+const CONVEX_URL =
+  process.env.CONVEX_URL || "https://peaceful-aardvark-549.convex.cloud";
+console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
 
-// Initialize Convex HTTP client with hardcoded URL
+// Initialize Convex HTTP client
 const convexClient = new ConvexHttpClient(CONVEX_URL);
 
 // Map to store pending payments keyed by CheckoutRequestID
@@ -113,9 +114,10 @@ router.post("/mpesa/callback", async (req, res) => {
 
     // Add player to Convex DB using HTTP client
     try {
-      await convexClient.mutation(api.players.addPlayer, {
+      // Since we don't have the api import, we need to use string paths
+      await convexClient.mutation("players:addPlayer" as any, {
         userId: pending.userId,
-        name: pending.username, // Use 'name' field with the username value
+        name: pending.username,
         tournamentId: pending.tournamentId,
         phoneNumber: pending.phone,
         amount: pending.amount,

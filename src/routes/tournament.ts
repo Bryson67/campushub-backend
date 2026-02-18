@@ -1,9 +1,9 @@
 import { ConvexHttpClient } from "convex/browser";
 import express from "express";
-import { api } from "../../convex/_generated/api";
 
 const router = express.Router();
-const CONVEX_URL = "https://peaceful-aardvark-549.convex.cloud";
+const CONVEX_URL =
+  process.env.CONVEX_URL || "https://peaceful-aardvark-549.convex.cloud";
 const convexClient = new ConvexHttpClient(CONVEX_URL);
 
 // Get lobby data by tournament ID
@@ -14,9 +14,9 @@ router.get("/lobby/:tournamentId", async (req, res) => {
 
     console.log("🎮 Fetching lobby for tournament:", tournamentId);
 
-    // Get tournament details
+    // Get tournament details - use string path instead of api object
     const tournament = await convexClient.query(
-      api.tournaments.getTournamentById,
+      "tournaments:getTournamentById" as any,
       {
         tournamentId,
       },
@@ -30,9 +30,12 @@ router.get("/lobby/:tournamentId", async (req, res) => {
     }
 
     // Get all players for this tournament
-    const players = await convexClient.query(api.players.getByTournamentId, {
-      tournamentId,
-    });
+    const players = await convexClient.query(
+      "players:getByTournamentId" as any,
+      {
+        tournamentId,
+      },
+    );
 
     // Check if current user is registered
     let isUserRegistered = false;
