@@ -33,12 +33,14 @@ app.get("/health", (req, res) => {
   });
 });
 
-// Add a root endpoint for testing
+// Add this before your other routes
 app.get("/", (req, res) => {
-  res.json({
-    message: "Campushub API is running",
-    endpoints: ["/health", "/api/pay", "/api/tournaments/lobby/:id"],
-  });
+  res.send("API is running");
+});
+
+// Also add a simple HEAD endpoint
+app.head("/health", (req, res) => {
+  res.status(200).end();
 });
 
 // Your routes
