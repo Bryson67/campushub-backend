@@ -12,22 +12,33 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
 } from "react-native";
 
 export default function WinnersPage() {
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
-  const [selectedGame, setSelectedGame] = useState<string | null>(null);
-  const [timeFilter, setTimeFilter] = useState<"week" | "month" | "all">("all");
-
-  // Get winners
-  const winners = useQuery(
-    api.tournaments.getWinners,
-    selectedGame ? { game: selectedGame } : {},
+  const [selectedTournament, setSelectedTournament] = useState<string | null>(
+    null,
   );
 
-  const topWinners = useQuery(api.tournaments.getTopWinners, { limit: 10 });
+  // Get ALL winners
+  const allWinners = useQuery(api.tournaments.getAllWinners);
+
+  // Get unique tournament names from winners
+  const getUniqueTournaments = () => {
+    if (!allWinners) return [];
+    const tournaments = allWinners.map((w) => w.tournamentName);
+    return ["All Tournaments", ...new Set(tournaments)];
+  };
+
+  const tournaments = getUniqueTournaments();
+
+  // Filter winners by selected tournament
+  const filteredWinners =
+    selectedTournament && selectedTournament !== "All Tournaments"
+      ? allWinners?.filter((w) => w.tournamentName === selectedTournament)
+      : allWinners;
 
   const onRefresh = useCallback(() => {
     setRefreshing(true);
@@ -50,26 +61,6 @@ export default function WinnersPage() {
     });
   };
 
-  const games = [
-    "All Games",
-    "PUBG",
-    "Call of Duty",
-    "Delta Force",
-    "FIFA",
-    "eFootball",
-  ];
-
-  const getGameIcon = (game: string) => {
-    const gameLower = game.toLowerCase();
-    if (gameLower.includes("pubg")) return "airplane";
-    if (gameLower.includes("call of duty") || gameLower.includes("cod"))
-      return "flash";
-    if (gameLower.includes("delta")) return "shield";
-    if (gameLower.includes("fifa") || gameLower.includes("football"))
-      return "football";
-    return "trophy";
-  };
-
   const getGameColor = (game: string) => {
     const gameLower = game.toLowerCase();
     if (gameLower.includes("pubg")) return "#f59e0b";
@@ -81,26 +72,31 @@ export default function WinnersPage() {
     return "#6366f1";
   };
 
-  const filterWinnersByTime = (winnersList: any[]) => {
-    if (timeFilter === "all") return winnersList;
-
-    const now = Date.now();
-    const weekInMs = 7 * 24 * 60 * 60 * 1000;
-    const monthInMs = 30 * 24 * 60 * 60 * 1000;
-
-    return winnersList.filter((w) => {
-      const winnerDate = new Date(w.date).getTime();
-      if (timeFilter === "week") {
-        return now - winnerDate <= weekInMs;
-      }
-      if (timeFilter === "month") {
-        return now - winnerDate <= monthInMs;
-      }
-      return true;
-    });
+  const getPositionColor = (position: number) => {
+    switch (position) {
+      case 1:
+        return "#FFD700"; // Gold
+      case 2:
+        return "#C0C0C0"; // Silver
+      case 3:
+        return "#CD7F32"; // Bronze
+      default:
+        return "#6366f1";
+    }
   };
 
-  const filteredWinners = winners ? filterWinnersByTime(winners) : [];
+  const getPositionIcon = (position: number) => {
+    switch (position) {
+      case 1:
+        return "trophy";
+      case 2:
+        return "medal";
+      case 3:
+        return "ribbon";
+      default:
+        return "person";
+    }
+  };
 
   return (
     <SafeAreaView style={styles.container}>
@@ -115,142 +111,45 @@ export default function WinnersPage() {
         <View style={styles.headerButton} />
       </View>
 
-      {/* Hero Section - Top Winners */}
-      <View style={styles.heroSection}>
-        <Text style={styles.heroTitle}>🏆 Champions League</Text>
-        <Text style={styles.heroSubtitle}>
-          Celebrating our tournament winners
-        </Text>
-
-        {topWinners && topWinners.length > 0 && (
-          <ScrollView
-            horizontal
-            showsHorizontalScrollIndicator={false}
-            style={styles.topWinnersScroll}
-          >
-            {topWinners.slice(0, 3).map((winner, index) => (
-              <View
-                key={winner._id}
-                style={[
-                  styles.topWinnerCard,
-                  {
-                    backgroundColor: getGameColor(winner.game),
-                    marginLeft: index === 0 ? 20 : 0,
-                  },
-                ]}
-              >
-                <View style={styles.topWinnerRank}>
-                  <Text style={styles.topWinnerRankText}>#{index + 1}</Text>
-                </View>
-                <View style={styles.topWinnerAvatar}>
-                  <Text style={styles.topWinnerAvatarText}>
-                    {winner.winnerName.charAt(0).toUpperCase()}
-                  </Text>
-                </View>
-                <Text style={styles.topWinnerName} numberOfLines={1}>
-                  {winner.winnerName}
-                </Text>
-                <Text style={styles.topWinnerPrize}>
-                  {formatCurrency(winner.prize)}
-                </Text>
-                <View style={styles.topWinnerGame}>
-                  <Ionicons
-                    name={getGameIcon(winner.game)}
-                    size={12}
-                    color="white"
-                  />
-                  <Text style={styles.topWinnerGameText}>{winner.game}</Text>
-                </View>
-              </View>
-            ))}
-          </ScrollView>
-        )}
-      </View>
-
-      {/* Filters */}
+      {/* Tournament Filter */}
       <View style={styles.filtersContainer}>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.gamesScroll}
+          style={styles.tournamentsScroll}
         >
-          {games.map((game) => (
+          {tournaments.map((tournament) => (
             <TouchableOpacity
-              key={game}
+              key={tournament}
               style={[
-                styles.gameChip,
-                (selectedGame === game ||
-                  (game === "All Games" && !selectedGame)) &&
-                  styles.selectedGameChip,
+                styles.tournamentChip,
+                (selectedTournament === tournament ||
+                  (tournament === "All Tournaments" && !selectedTournament)) &&
+                  styles.selectedTournamentChip,
               ]}
               onPress={() =>
-                setSelectedGame(game === "All Games" ? null : game)
+                setSelectedTournament(
+                  tournament === "All Tournaments" ? null : tournament,
+                )
               }
             >
               <Text
                 style={[
-                  styles.gameChipText,
-                  (selectedGame === game ||
-                    (game === "All Games" && !selectedGame)) &&
-                    styles.selectedGameChipText,
+                  styles.tournamentChipText,
+                  (selectedTournament === tournament ||
+                    (tournament === "All Tournaments" &&
+                      !selectedTournament)) &&
+                    styles.selectedTournamentChipText,
                 ]}
+                numberOfLines={1}
               >
-                {game}
+                {tournament === "All Tournaments"
+                  ? "🏆 All Tournaments"
+                  : `🏆 ${tournament}`}
               </Text>
             </TouchableOpacity>
           ))}
         </ScrollView>
-
-        <View style={styles.timeFilters}>
-          <TouchableOpacity
-            style={[
-              styles.timeChip,
-              timeFilter === "week" && styles.selectedTimeChip,
-            ]}
-            onPress={() => setTimeFilter("week")}
-          >
-            <Text
-              style={[
-                styles.timeChipText,
-                timeFilter === "week" && styles.selectedTimeChipText,
-              ]}
-            >
-              This Week
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.timeChip,
-              timeFilter === "month" && styles.selectedTimeChip,
-            ]}
-            onPress={() => setTimeFilter("month")}
-          >
-            <Text
-              style={[
-                styles.timeChipText,
-                timeFilter === "month" && styles.selectedTimeChipText,
-              ]}
-            >
-              This Month
-            </Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.timeChip,
-              timeFilter === "all" && styles.selectedTimeChip,
-            ]}
-            onPress={() => setTimeFilter("all")}
-          >
-            <Text
-              style={[
-                styles.timeChipText,
-                timeFilter === "all" && styles.selectedTimeChipText,
-              ]}
-            >
-              All Time
-            </Text>
-          </TouchableOpacity>
-        </View>
       </View>
 
       {/* Winners List */}
@@ -270,31 +169,36 @@ export default function WinnersPage() {
               ]}
             >
               <Text style={styles.winnerAvatarText}>
-                {item.winnerName.charAt(0).toUpperCase()}
+                {item.winnerName?.charAt(0).toUpperCase() || "?"}
               </Text>
             </View>
 
             <View style={styles.winnerInfo}>
               <View style={styles.winnerHeader}>
                 <Text style={styles.winnerName}>{item.winnerName}</Text>
-                <View style={styles.winnerGameBadge}>
+                <View
+                  style={[
+                    styles.positionBadge,
+                    { backgroundColor: getPositionColor(item.position) },
+                  ]}
+                >
                   <Ionicons
-                    name={getGameIcon(item.game)}
+                    name={getPositionIcon(item.position)}
                     size={12}
-                    color={getGameColor(item.game)}
+                    color="#fff"
                   />
-                  <Text
-                    style={[
-                      styles.winnerGameText,
-                      { color: getGameColor(item.game) },
-                    ]}
-                  >
-                    {item.game}
+                  <Text style={styles.positionText}>
+                    {item.position === 1
+                      ? "1st"
+                      : item.position === 2
+                        ? "2nd"
+                        : "3rd"}
                   </Text>
                 </View>
               </View>
 
               <Text style={styles.tournamentName}>{item.tournamentName}</Text>
+              <Text style={styles.gameName}>🎮 {item.game}</Text>
 
               <View style={styles.statsGrid}>
                 <View style={styles.statItem}>
@@ -312,58 +216,16 @@ export default function WinnersPage() {
                 <View style={styles.statItem}>
                   <Ionicons name="game-controller" size={16} color="#6366f1" />
                   <Text style={styles.statValue}>
-                    {item.matchesPlayed} matches
+                    {item.matchesPlayed || 0} matches
                   </Text>
                 </View>
-
-                {item.kills !== undefined && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="skull" size={16} color="#f59e0b" />
-                    <Text style={styles.statValue}>{item.kills} kills</Text>
-                  </View>
-                )}
-
-                {item.deaths !== undefined && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="heart-dislike" size={16} color="#ef4444" />
-                    <Text style={styles.statValue}>{item.deaths} deaths</Text>
-                  </View>
-                )}
-
-                {item.headshots !== undefined && item.headshots > 0 && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="eye" size={16} color="#3b82f6" />
-                    <Text style={styles.statValue}>{item.headshots} HS</Text>
-                  </View>
-                )}
-
-                {item.averageScore !== undefined && (
-                  <View style={styles.statItem}>
-                    <Ionicons name="stats-chart" size={16} color="#8b5cf6" />
-                    <Text style={styles.statValue}>
-                      Avg: {item.averageScore}
-                    </Text>
-                  </View>
-                )}
               </View>
-            </View>
-
-            <View style={styles.winnerBadge}>
-              <Ionicons name="trophy" size={20} color="#f59e0b" />
             </View>
           </View>
         )}
-        ListHeaderComponent={
-          filteredWinners.length > 0 ? (
-            <Text style={styles.sectionTitle}>
-              {filteredWinners.length} Winner
-              {filteredWinners.length !== 1 ? "s" : ""}
-            </Text>
-          ) : null
-        }
         ListEmptyComponent={
           <View style={styles.emptyState}>
-            <Ionicons name="trophy-outline" size={64} color="#d1d5db" />
+            <Ionicons name="trophy-outline" size={64} color="#333" />
             <Text style={styles.emptyStateTitle}>No winners yet</Text>
             <Text style={styles.emptyStateText}>
               Complete tournaments to see winners here
@@ -374,8 +236,8 @@ export default function WinnersPage() {
           <RefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            colors={["#6366f1"]}
-            tintColor="#6366f1"
+            colors={["#00ffff"]}
+            tintColor="#00ffff"
           />
         }
         contentContainerStyle={styles.listContent}
@@ -387,10 +249,10 @@ export default function WinnersPage() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f9fafb",
+    backgroundColor: "#050b1f",
   },
   header: {
-    backgroundColor: "#6366f1",
+    backgroundColor: "#00ffff",
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -404,177 +266,65 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "white",
-  },
-  heroSection: {
-    backgroundColor: "white",
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
-  },
-  heroTitle: {
-    fontSize: 24,
-    fontWeight: "bold",
-    color: "#1f2937",
-    paddingHorizontal: 20,
-  },
-  heroSubtitle: {
-    fontSize: 14,
-    color: "#6b7280",
-    paddingHorizontal: 20,
-    marginTop: 4,
-    marginBottom: 16,
-  },
-  topWinnersScroll: {
-    flexDirection: "row",
-  },
-  topWinnerCard: {
-    width: 160,
-    height: 200,
-    borderRadius: 16,
-    padding: 16,
-    marginRight: 12,
-    justifyContent: "space-between",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  topWinnerRank: {
-    position: "absolute",
-    top: 12,
-    right: 12,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  topWinnerRankText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "700",
-  },
-  topWinnerAvatar: {
-    width: 64,
-    height: 64,
-    borderRadius: 32,
-    backgroundColor: "rgba(255,255,255,0.3)",
-    justifyContent: "center",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  topWinnerAvatarText: {
-    fontSize: 28,
-    fontWeight: "600",
-    color: "white",
-  },
-  topWinnerName: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "white",
-    marginBottom: 4,
-  },
-  topWinnerPrize: {
-    fontSize: 14,
-    fontWeight: "700",
-    color: "white",
-    marginBottom: 8,
-  },
-  topWinnerGame: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 4,
-  },
-  topWinnerGameText: {
-    fontSize: 12,
-    color: "white",
-    opacity: 0.9,
+    color: "#050b1f",
   },
   filtersContainer: {
-    backgroundColor: "white",
+    backgroundColor: "#0a1333",
     paddingVertical: 12,
     borderBottomWidth: 1,
-    borderBottomColor: "#e5e7eb",
+    borderBottomColor: "#00ffff",
   },
-  gamesScroll: {
+  tournamentsScroll: {
     paddingHorizontal: 16,
-    marginBottom: 8,
   },
-  gameChip: {
+  tournamentChip: {
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#1a2555",
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#333",
+    maxWidth: 200,
   },
-  selectedGameChip: {
-    backgroundColor: "#6366f1",
+  selectedTournamentChip: {
+    backgroundColor: "#00ffff",
+    borderColor: "#00ffff",
   },
-  gameChipText: {
+  tournamentChipText: {
     fontSize: 14,
-    color: "#4b5563",
+    color: "#fff",
   },
-  selectedGameChipText: {
-    color: "white",
-  },
-  timeFilters: {
-    flexDirection: "row",
-    paddingHorizontal: 16,
-    gap: 8,
-  },
-  timeChip: {
-    flex: 1,
-    paddingVertical: 6,
-    borderRadius: 16,
-    backgroundColor: "#f3f4f6",
-    alignItems: "center",
-  },
-  selectedTimeChip: {
-    backgroundColor: "#6366f1",
-  },
-  timeChipText: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-  selectedTimeChipText: {
-    color: "white",
-  },
-  sectionTitle: {
-    fontSize: 18,
+  selectedTournamentChipText: {
+    color: "#050b1f",
     fontWeight: "600",
-    color: "#1f2937",
-    marginBottom: 12,
-    paddingHorizontal: 16,
   },
   listContent: {
     padding: 16,
   },
   winnerCard: {
     flexDirection: "row",
-    backgroundColor: "white",
+    backgroundColor: "#0a1333",
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: "#00ffff",
     position: "relative",
   },
   winnerRank: {
     position: "absolute",
     top: 12,
     left: 12,
-    backgroundColor: "#f3f4f6",
+    backgroundColor: "#1a2555",
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 12,
+    zIndex: 1,
   },
   winnerRankText: {
     fontSize: 10,
-    color: "#6b7280",
+    color: "#00ffff",
     fontWeight: "600",
   },
   winnerAvatar: {
@@ -604,20 +354,30 @@ const styles = StyleSheet.create({
   winnerName: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#fff",
   },
-  winnerGameBadge: {
+  positionBadge: {
     flexDirection: "row",
     alignItems: "center",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
     gap: 4,
   },
-  winnerGameText: {
-    fontSize: 12,
-    fontWeight: "500",
+  positionText: {
+    fontSize: 10,
+    color: "#fff",
+    fontWeight: "600",
   },
   tournamentName: {
     fontSize: 13,
-    color: "#6b7280",
+    color: "#00ffff",
+    marginBottom: 2,
+    fontWeight: "500",
+  },
+  gameName: {
+    fontSize: 12,
+    color: "#aaa",
     marginBottom: 8,
   },
   statsGrid: {
@@ -632,12 +392,7 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 12,
-    color: "#4b5563",
-  },
-  winnerBadge: {
-    position: "absolute",
-    top: 12,
-    right: 12,
+    color: "#fff",
   },
   emptyState: {
     alignItems: "center",
@@ -647,13 +402,13 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontWeight: "600",
-    color: "#1f2937",
+    color: "#fff",
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
-    color: "#6b7280",
+    color: "#aaa",
     textAlign: "center",
   },
 });

@@ -1,3 +1,4 @@
+import { AdBanner } from "@/components/AdBanner";
 import { api } from "@/convex/_generated/api";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -221,7 +222,7 @@ export default function GamerTag() {
     <View style={{ flex: 1, backgroundColor: "#050b1f" }}>
       <ScrollView
         style={styles.container}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={{ paddingBottom: 100 }}
         showsVerticalScrollIndicator={false}
         refreshControl={
           <RefreshControl
@@ -287,13 +288,13 @@ export default function GamerTag() {
           <View style={styles.statsGrid}>
             <View style={styles.statCard}>
               <Ionicons name="trophy" size={24} color="#ffee00" />
-              <Text style={styles.statValue}>{user.wins || 0}</Text>
+              <Text style={styles.statValue}>{user.stats?.wins || 0}</Text>
               <Text style={styles.statLabel}>Wins</Text>
             </View>
             <View style={styles.statCard}>
               <Ionicons name="game-controller" size={24} color="#00ffff" />
               <Text style={styles.statValue}>
-                {user.tournamentsPlayed || 0}
+                {user.stats?.totalMatches || 0}
               </Text>
               <Text style={styles.statLabel}>Played</Text>
             </View>
@@ -369,7 +370,6 @@ export default function GamerTag() {
         {/* Content based on active tab */}
         {activeTab === "profile" && (
           <View style={styles.contentSection}>
-            {/* Games Selection */}
             <Text style={styles.sectionTitle}>🎮 Select Your Games</Text>
             <View style={styles.gamesGrid}>
               {GAMES.map((game) => {
@@ -401,7 +401,6 @@ export default function GamerTag() {
               })}
             </View>
 
-            {/* Selected Games */}
             <Text style={styles.sectionTitle}>✨ Your Games</Text>
             <View style={styles.selectedGamesContainer}>
               {user.selectedGames && user.selectedGames.length > 0 ? (
@@ -543,7 +542,6 @@ export default function GamerTag() {
               </View>
             </View>
 
-            {/* Performance Chart Placeholder */}
             <View style={styles.chartPlaceholder}>
               <Ionicons name="stats-chart" size={32} color="#333" />
               <Text style={styles.chartPlaceholderText}>
@@ -554,7 +552,10 @@ export default function GamerTag() {
         )}
       </ScrollView>
 
-      {/* Ad Banner at the bottom */}
+      {/* AD BANNER - FIXED AT BOTTOM */}
+      <View style={styles.adFixedContainer}>
+        <AdBanner />
+      </View>
     </View>
   );
 }
@@ -564,10 +565,19 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#050b1f",
   },
-  adBanner: {
+  adFixedContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 80,
     backgroundColor: "#0a1333",
-    borderTopWidth: 1,
+    borderTopWidth: 2,
     borderTopColor: "#00ffff",
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 1000,
+    elevation: 10,
   },
   avatarLoading: {
     opacity: 0.5,
@@ -592,9 +602,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     marginTop: 8,
     textAlign: "center",
-  },
-  scrollContent: {
-    paddingBottom: 20,
   },
   header: {
     flexDirection: "row",

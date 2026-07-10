@@ -1,3 +1,4 @@
+import { SquareAd } from "@/components/SquareAd";
 import { api } from "@/convex/_generated/api";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
@@ -123,7 +124,7 @@ export default function PayTournament() {
         amount: tournament.fee,
         userId,
         tournamentId,
-        username, // ✅ Now using the ACTUAL username from storage
+        username,
       });
 
       if (res.data.success) {
@@ -208,6 +209,21 @@ export default function PayTournament() {
           Processing... Check your phone for STK prompt
         </Text>
       )}
+
+      <View
+        style={{
+          margin: 16,
+          marginTop: 80,
+          backgroundColor: "#0a1333",
+          borderRadius: 12,
+          padding: 10,
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor: "#00ffff",
+        }}
+      >
+        <SquareAd />
+      </View>
     </View>
   );
 }

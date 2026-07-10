@@ -8,6 +8,7 @@
  * @module
  */
 
+import type * as disputes from "../disputes.js";
 import type * as getAll from "../getAll.js";
 import type * as http from "../http.js";
 import type * as matches from "../matches.js";
@@ -24,6 +25,7 @@ import type {
 } from "convex/server";
 
 declare const fullApi: ApiFromModules<{
+  disputes: typeof disputes;
   getAll: typeof getAll;
   http: typeof http;
   matches: typeof matches;

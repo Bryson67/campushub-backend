@@ -116,12 +116,16 @@ export default defineSchema({
 
   disputes: defineTable({
     matchId: v.id("matches"),
+    initiatedBy: v.string(), // User ID who initiated the dispute
     reason: v.string(),
     evidence: v.array(v.string()),
     disputedScore: v.object({
       player1Score: v.number(),
       player2Score: v.number(),
     }),
+    player1Screenshot: v.optional(v.id("_storage")), // Storage ID for screenshot
+    player2Screenshot: v.optional(v.id("_storage")), // Storage ID for screenshot
+
     status: v.string(),
     createdAt: v.number(),
     resolvedBy: v.optional(v.string()),
@@ -143,9 +147,11 @@ export default defineSchema({
     headshots: v.optional(v.number()),
     averageScore: v.optional(v.number()),
     winStreak: v.optional(v.number()),
+    position: v.number(), // 1st, 2nd, 3rd
   })
     .index("by_date", ["date"])
-    .index("by_game", ["game"]),
+    .index("by_game", ["game"])
+    .index("by_position", ["position"]),
 
   withdrawals: defineTable({
     userId: v.string(),

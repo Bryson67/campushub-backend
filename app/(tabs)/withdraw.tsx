@@ -1,3 +1,4 @@
+import { SquareAd } from "@/components/SquareAd";
 import { api } from "@/convex/_generated/api";
 import { Ionicons } from "@expo/vector-icons";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -5,15 +6,15 @@ import { useMutation, useQuery } from "convex/react";
 import { useRouter } from "expo-router";
 import { useEffect, useState } from "react";
 import {
-    ActivityIndicator,
-    Alert,
-    RefreshControl,
-    ScrollView,
-    StyleSheet,
-    Text,
-    TextInput,
-    TouchableOpacity,
-    View,
+  ActivityIndicator,
+  Alert,
+  RefreshControl,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
 
 export default function WithdrawPage() {
@@ -358,6 +359,20 @@ export default function WithdrawPage() {
           ))}
         </View>
       )}
+      <View
+        style={{
+          margin: 16,
+          marginTop: 0,
+          backgroundColor: "#0a1333",
+          borderRadius: 12,
+          padding: 10,
+          alignItems: "center",
+          borderWidth: 1,
+          borderColor: "#00ffff",
+        }}
+      >
+        <SquareAd />
+      </View>
     </ScrollView>
   );
 }
