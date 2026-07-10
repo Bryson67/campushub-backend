@@ -1,7 +1,11 @@
 // backend/src/routes/payments.ts
+import axios from "axios";
 import { ConvexHttpClient } from "convex/browser";
-import Mpesa from "daraja-sdk";
+import dotenv from "dotenv";
 import express from "express";
+import path from "path";
+
+dotenv.config({ path: path.resolve(__dirname, "../../.env") });
 
 const router = express.Router();
 
@@ -10,41 +14,6 @@ const CONVEX_URL =
   process.env.CONVEX_URL || "https://peaceful-aardvark-549.convex.cloud";
 console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
 const convexClient = new ConvexHttpClient(CONVEX_URL);
-
-// Check environment variables
-console.log("🔍 Checking M-Pesa environment variables:");
-console.log(
-  "  MPESA_CONSUMER_KEY:",
-  process.env.MPESA_CONSUMER_KEY ? "✅ Set" : "❌ Not set",
-);
-console.log(
-  "  MPESA_CONSUMER_SECRET:",
-  process.env.MPESA_CONSUMER_SECRET ? "✅ Set" : "❌ Not set",
-);
-console.log(
-  "  MPESA_SHORTCODE:",
-  process.env.MPESA_SHORTCODE ? "✅ Set" : "❌ Not set",
-);
-console.log(
-  "  MPESA_PASSKEY:",
-  process.env.MPESA_PASSKEY ? "✅ Set" : "❌ Not set",
-);
-
-// Initialize Daraja SDK with proper error handling
-let mpesa: any = null;
-try {
-  mpesa = new Mpesa({
-    consumerKey: process.env.MPESA_CONSUMER_KEY!,
-    consumerSecret: process.env.MPESA_CONSUMER_SECRET!,
-    passkey: process.env.MPESA_PASSKEY!,
-    environment: process.env.NODE_ENV === "production" ? "live" : "sandbox",
-  });
-  console.log("📦 M-Pesa initialized successfully");
-} catch (error) {
-  console.error("❌ Failed to initialize M-Pesa:", error);
-}
-
-console.log("📦 Using Shortcode:", process.env.MPESA_SHORTCODE);
 
 // Map to store pending payments
 const pendingPayments = new Map<
@@ -58,24 +27,54 @@ const pendingPayments = new Map<
   }
 >();
 
-// Generate unique reference
+// Helper functions for Daraja API
+const getTimestamp = (): string => {
+  const date = new Date();
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  const hours = String(date.getHours()).padStart(2, "0");
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const seconds = String(date.getSeconds()).padStart(2, "0");
+  return `${year}${month}${day}${hours}${minutes}${seconds}`;
+};
+
+const generatePassword = (timestamp: string): string => {
+  const shortcode = process.env.MPESA_SHORTCODE!;
+  const passkey = process.env.MPESA_PASSKEY!;
+  const data = shortcode + passkey + timestamp;
+  return Buffer.from(data).toString("base64");
+};
+
+const getAccessToken = async (): Promise<string> => {
+  const auth = Buffer.from(
+    `${process.env.MPESA_CONSUMER_KEY}:${process.env.MPESA_CONSUMER_SECRET}`,
+  ).toString("base64");
+
+  const response = await axios.get(
+    "https://sandbox.safaricom.co.ke/oauth/v1/generate?grant_type=client_credentials",
+    {
+      headers: {
+        Authorization: `Basic ${auth}`,
+      },
+    },
+  );
+
+  return response.data.access_token;
+};
+
+// Generate unique reference (max 12 characters)
 const generateReference = () => {
-  return `CAMP-${Date.now()}-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+  const timestamp = Date.now().toString().slice(-8);
+  const random = Math.random().toString(36).substring(2, 6).toUpperCase();
+  return `${timestamp}${random}`;
 };
 
 // --------------------------
-// Initiate Payment with Daraja SDK
+// Initiate Payment with Direct Daraja API
 // --------------------------
 router.post("/pay", async (req, res) => {
   try {
-    // Check if M-Pesa is initialized
-    if (!mpesa) {
-      return res.status(500).json({
-        success: false,
-        error: "M-Pesa service not initialized. Check environment variables.",
-      });
-    }
-
     const { phone, amount, userId, username, tournamentId } = req.body;
 
     if (!phone || !amount || !userId || !username || !tournamentId) {
@@ -84,7 +83,7 @@ router.post("/pay", async (req, res) => {
         .json({ success: false, error: "Missing required fields" });
     }
 
-    // Format phone (ensure 254 format)
+    // Format phone
     const formattedPhone = phone.startsWith("0")
       ? "254" + phone.slice(1)
       : phone.startsWith("254")
@@ -92,6 +91,9 @@ router.post("/pay", async (req, res) => {
         : "254" + phone;
 
     const accountRef = generateReference();
+    const timestamp = getTimestamp();
+    const password = generatePassword(timestamp);
+    const shortcode = process.env.MPESA_SHORTCODE!;
 
     console.log("📤 Initiating M-Pesa STK Push:", {
       phone: formattedPhone,
@@ -101,24 +103,44 @@ router.post("/pay", async (req, res) => {
       tournamentId,
     });
 
-    // STK Push via Daraja SDK
-    const response = await mpesa.stkPush({
-      BusinessShortCode: process.env.MPESA_SHORTCODE!,
+    // Get access token
+    const token = await getAccessToken();
+
+    // Prepare the payload
+    const payload = {
+      BusinessShortCode: shortcode, // Keep as string (will be converted to number by API)
+      Password: password,
+      Timestamp: timestamp,
+      TransactionType: "CustomerPayBillOnline",
       Amount: Number(amount),
       PartyA: formattedPhone,
+      PartyB: shortcode,
       PhoneNumber: formattedPhone,
       CallBackURL:
         process.env.MPESA_CALLBACK_URL ||
         "https://campushub-api-6830.onrender.com/api/daraja-webhook",
       AccountReference: accountRef,
-      TransactionDesc: `Tournament Entry Fee - ${tournamentId}`,
-    });
+      TransactionDesc: "Entry Fee",
+    };
 
-    console.log("✅ M-Pesa response:", response);
+    console.log("📤 Payload:", JSON.stringify(payload, null, 2));
+
+    // Make the STK Push request
+    const response = await axios.post(
+      "https://sandbox.safaricom.co.ke/mpesa/stkpush/v1/processrequest",
+      payload,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
+
+    console.log("✅ M-Pesa response:", response.data);
 
     // Store pending payment
-    const checkoutId =
-      response.CheckoutRequestID || response.checkout_request_id;
+    const checkoutId = response.data.CheckoutRequestID;
     pendingPayments.set(checkoutId, {
       userId,
       username,
@@ -131,7 +153,7 @@ router.post("/pay", async (req, res) => {
       success: true,
       message: "STK push sent",
       checkoutId: checkoutId,
-      data: response,
+      data: response.data,
     });
   } catch (err: any) {
     console.error("❌ Error initiating payment:", err.message);
@@ -211,17 +233,11 @@ router.post("/daraja-webhook", async (req, res) => {
 // --------------------------
 router.get("/test-mpesa", async (req, res) => {
   try {
-    if (!mpesa) {
-      return res.status(500).json({
-        success: false,
-        error: "M-Pesa service not initialized",
-      });
-    }
-    const token = await mpesa.getAccessToken();
+    const token = await getAccessToken();
     res.json({
       success: true,
       message: "M-Pesa connected!",
-      token: token.substring(0, 20) + "...",
+      token: token ? "✅ Obtained" : "❌ Not obtained",
     });
   } catch (err: any) {
     console.error("❌ M-Pesa test error:", err.message);

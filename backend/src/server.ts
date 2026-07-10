@@ -1,11 +1,26 @@
+// backend/src/server.ts
 import dotenv from "dotenv";
-import express from "express";
+import fs from "fs";
 import path from "path";
+
+// Load environment variables with absolute path
+const envPath = path.resolve(__dirname, "../.env");
+console.log(`📂 Loading .env from: ${envPath}`);
+console.log(`📂 File exists: ${fs.existsSync(envPath)}`);
+
+// Force load the .env file
+const result = dotenv.config({ path: envPath });
+if (result.error) {
+  console.error("❌ Error loading .env:", result.error);
+} else {
+  console.log("✅ .env loaded successfully");
+  console.log("📋 Loaded keys:", Object.keys(result.parsed || {}).join(", "));
+}
+
+// Rest of your imports...
+import express from "express";
 import paymentsRouter from "./routes/payments";
 import tournamentRouter from "./routes/tournament";
-
-// Load environment variables
-dotenv.config({ path: path.resolve(__dirname, "../.env") });
 
 const app = express();
 app.use(express.json());
@@ -19,6 +34,8 @@ console.log(
   "- MPESA variables:",
   process.env.MPESA_CONSUMER_KEY ? "✅ Set" : "❌ Not set",
 );
+
+// ... rest of your code
 
 // ✅ Health check endpoint with detailed logging
 app.get("/health", (req, res) => {
