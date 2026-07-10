@@ -1,339 +1,187 @@
-import { SquareAd } from "@/components/SquareAd";
-import { api } from "@/convex/_generated/api";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// backend/src/routes/payments.ts
 import axios from "axios";
-import { useQuery } from "convex/react";
-import { useLocalSearchParams, useRouter } from "expo-router";
-import { useEffect, useState } from "react";
-import {
-  ActivityIndicator,
-  Alert,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
+import { ConvexHttpClient } from "convex/browser";
+import express from "express";
 
-export default function PayTournament() {
-  const router = useRouter();
-  const { tournamentId } = useLocalSearchParams<{ tournamentId: string }>();
+const router = express.Router();
 
-  const [phone, setPhone] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [userId, setUserId] = useState("");
-  const [username, setUsername] = useState("");
-  const [isLoadingUser, setIsLoadingUser] = useState(true);
+// Initialize Convex HTTP client
+const CONVEX_URL =
+  process.env.CONVEX_URL || "https://peaceful-aardvark-549.convex.cloud";
+console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
+const convexClient = new ConvexHttpClient(CONVEX_URL);
 
-  // Get tournament details
-  const tournament = useQuery(
-    api.tournaments.getTournamentById,
-    tournamentId ? { tournamentId } : "skip",
-  );
-
-  // ✅ Get API URL from environment variables
-  const API_URL = process.env.EXPO_PUBLIC_API_URL;
-
-  // Debug logs
-  console.log("🔍 API URL from env:", API_URL);
-  console.log("🔍 Full payment URL:", `${API_URL}/api/pay`);
-
-  // Load user data from AsyncStorage
-  useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        setIsLoadingUser(true);
-
-        // Get userId from storage
-        const storedUserId = await AsyncStorage.getItem("userId");
-        const storedEmail = await AsyncStorage.getItem("userEmail");
-
-        console.log("📱 Loaded userId:", storedUserId);
-        console.log("📱 Loaded email:", storedEmail);
-
-        if (storedUserId) {
-          setUserId(storedUserId);
-          // Use email username part as fallback, or you can fetch full name from your users table
-          const userDisplayName = storedEmail
-            ? storedEmail.split("@")[0]
-            : "Player";
-          setUsername(userDisplayName);
-        } else {
-          // No user logged in, redirect to login
-          Alert.alert("Not Logged In", "Please log in first");
-          router.replace("/SignIn");
-        }
-      } catch (error) {
-        console.error("Error loading user data:", error);
-        Alert.alert("Error", "Failed to load user data");
-      } finally {
-        setIsLoadingUser(false);
-      }
-    };
-
-    loadUserData();
-  }, []);
-
-  useEffect(() => {
-    if (!tournamentId) {
-      Alert.alert("Error", "No tournament selected");
-      router.back();
-    }
-  }, [tournamentId]);
-
-  const handlePay = async () => {
-    if (loading) return;
-    if (!phone) {
-      Alert.alert("Error", "Please enter your phone number");
-      return;
-    }
-    if (!tournament) {
-      Alert.alert("Error", "Tournament not found");
-      return;
-    }
-    if (!userId) {
-      Alert.alert("Error", "User not authenticated");
-      router.replace("/SignIn");
-      return;
-    }
-    if (!API_URL) {
-      Alert.alert("Error", "API URL not configured");
-      console.error("❌ EXPO_PUBLIC_API_URL is not set");
-      return;
-    }
-
-    // Format phone number (add 254 if starts with 0)
-    let formattedPhone = phone.trim();
-    if (formattedPhone.startsWith("0")) {
-      formattedPhone = "254" + formattedPhone.slice(1);
-    } else if (!formattedPhone.startsWith("254")) {
-      formattedPhone = "254" + formattedPhone;
-    }
-
-    setLoading(true);
-
-    try {
-      console.log("💳 Processing payment for:", {
-        userId,
-        username,
-        tournamentId,
-      });
-
-      const res = await axios.post(`${API_URL}/api/pay`, {
-        phone: formattedPhone,
-        amount: tournament.fee,
-        userId,
-        tournamentId,
-        username,
-      });
-
-      if (res.data.success) {
-        Alert.alert(
-          "✅ Success",
-          "STK push sent! Check your phone to complete payment.",
-          [
-            {
-              text: "OK",
-              onPress: () => {
-                router.push(`/lobby?tournamentId=${tournamentId}`);
-              },
-            },
-          ],
-        );
-      } else {
-        Alert.alert("Payment failed", res.data.error);
-      }
-    } catch (e: any) {
-      console.error("❌ Payment error:", e);
-      Alert.alert(
-        "Error",
-        e.response?.data?.error || "Network error. Please try again.",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Show loading while fetching user data
-  if (isLoadingUser || !tournament) {
-    return (
-      <View style={styles.centered}>
-        <ActivityIndicator size="large" color="#00ffff" />
-        <Text style={styles.loadingText}>
-          {isLoadingUser ? "Loading user data..." : "Loading tournament..."}
-        </Text>
-      </View>
-    );
+// Map to store pending payments
+const pendingPayments = new Map<
+  string,
+  {
+    userId: string;
+    username: string;
+    tournamentId: string;
+    amount: number;
+    phone: string;
   }
+>();
 
-  return (
-    <View style={styles.container}>
-      <Text style={styles.title}>Pay Tournament Fee</Text>
+// --------------------------
+// Initiate Payment with Sunny Payments REST API
+// --------------------------
+router.post("/pay", async (req, res) => {
+  try {
+    const { phone, amount, userId, username, tournamentId } = req.body;
 
-      <View style={styles.userInfo}>
-        <Text style={styles.userName}>Player: {username}</Text>
-      </View>
+    if (!phone || !amount || !userId || !username || !tournamentId) {
+      return res
+        .status(400)
+        .json({ success: false, error: "Missing required fields" });
+    }
 
-      <View style={styles.tournamentInfo}>
-        <Text style={styles.tournamentName}>{tournament.name}</Text>
-        <Text style={styles.gameText}>🎮 {tournament.game}</Text>
-        <Text style={styles.feeText}>Entry Fee: KES {tournament.fee}</Text>
-      </View>
+    // Format phone
+    const formattedPhone = phone.startsWith("0")
+      ? "254" + phone.slice(1)
+      : phone.startsWith("254")
+        ? phone
+        : "254" + phone;
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          placeholder="Phone Number (e.g., 0712345678)"
-          placeholderTextColor="#999"
-          keyboardType="phone-pad"
-          value={phone}
-          onChangeText={setPhone}
-        />
-        <Text style={styles.hint}>Format: 0712345678 or 254712345678</Text>
-      </View>
+    // Generate reference
+    const accountRef = `CAMP-${Date.now()}`;
 
-      <TouchableOpacity
-        style={[styles.button, loading && styles.buttonDisabled]}
-        onPress={handlePay}
-        disabled={loading}
-      >
-        {loading ? (
-          <ActivityIndicator color="#050b1f" />
-        ) : (
-          <Text style={styles.buttonText}>PAY NOW</Text>
-        )}
-      </TouchableOpacity>
+    console.log("📤 Initiating Sunny Payment:", {
+      phone: formattedPhone,
+      amount,
+      reference: accountRef,
+      userId,
+      tournamentId,
+    });
 
-      {loading && (
-        <Text style={styles.processingText}>
-          Processing... Check your phone for STK prompt
-        </Text>
-      )}
+    // Call Sunny Payments REST API
+    const response = await axios.post(
+      "https://api.sunnypayments.com/v1/mpesa/stkpush",
+      {
+        phoneNumber: formattedPhone,
+        amount: Number(amount),
+        accountReference: accountRef,
+        transactionDesc: `Tournament Entry Fee - ${tournamentId}`,
+        callbackUrl:
+          process.env.SUNNY_CALLBACK_URL ||
+          "https://campushub-api-6830.onrender.com/api/webhook",
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SUNNY_SECRET_KEY}`,
+          "Content-Type": "application/json",
+        },
+      },
+    );
 
-      <View
-        style={{
-          margin: 16,
-          marginTop: 80,
-          backgroundColor: "#0a1333",
-          borderRadius: 12,
-          padding: 10,
-          alignItems: "center",
-          borderWidth: 1,
-          borderColor: "#00ffff",
-        }}
-      >
-        <SquareAd />
-      </View>
-    </View>
-  );
-}
+    console.log("✅ Sunny Payment response:", response.data);
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: "center",
-    padding: 20,
-    backgroundColor: "#050b1f",
-  },
-  centered: {
-    flex: 1,
-    justifyContent: "center",
-    alignItems: "center",
-    backgroundColor: "#050b1f",
-  },
-  loadingText: {
-    marginTop: 10,
-    fontSize: 16,
-    color: "#aaa",
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: "bold",
-    marginBottom: 20,
-    textAlign: "center",
-    color: "#00ffff",
-    letterSpacing: 1,
-  },
-  userInfo: {
-    backgroundColor: "#0a1333",
-    padding: 12,
-    borderRadius: 10,
-    marginBottom: 15,
-    borderWidth: 1,
-    borderColor: "#00ffff",
-  },
-  userName: {
-    color: "#fff",
-    fontSize: 16,
-    textAlign: "center",
-  },
-  tournamentInfo: {
-    backgroundColor: "#0a1333",
-    padding: 20,
-    borderRadius: 16,
-    marginBottom: 25,
-    borderWidth: 1,
-    borderColor: "#00ffff",
-  },
-  tournamentName: {
-    fontSize: 20,
-    fontWeight: "bold",
-    marginBottom: 8,
-    color: "#fff",
-  },
-  gameText: {
-    fontSize: 16,
-    color: "#aaa",
-    marginBottom: 4,
-  },
-  feeText: {
-    fontSize: 18,
-    color: "#00ffff",
-    fontWeight: "600",
-    marginTop: 8,
-  },
-  inputContainer: {
-    marginBottom: 25,
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: "#00ffff",
-    borderRadius: 12,
-    padding: 15,
-    backgroundColor: "#0a1333",
-    color: "#fff",
-    fontSize: 16,
-  },
-  hint: {
-    color: "#aaa",
-    fontSize: 12,
-    marginTop: 8,
-    marginLeft: 5,
-  },
-  button: {
-    backgroundColor: "#00ffff",
-    borderRadius: 12,
-    padding: 18,
-    alignItems: "center",
-    shadowColor: "#00ffff",
-    shadowOffset: { width: 0, height: 0 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 5,
-  },
-  buttonDisabled: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#050b1f",
-    fontSize: 18,
-    fontWeight: "bold",
-    letterSpacing: 1,
-  },
-  processingText: {
-    color: "#00ffff",
-    textAlign: "center",
-    marginTop: 20,
-    fontSize: 14,
-  },
+    // Store pending payment
+    const transactionId =
+      response.data.checkout_request_id || response.data.id || accountRef;
+    pendingPayments.set(transactionId, {
+      userId,
+      username,
+      tournamentId,
+      amount: Number(amount),
+      phone: formattedPhone,
+    });
+
+    res.json({
+      success: true,
+      message: "STK push sent",
+      checkoutId: transactionId,
+      data: response.data,
+    });
+  } catch (err: any) {
+    console.error("❌ Error initiating payment:", err.message);
+    if (err.response) {
+      console.error("❌ Sunny error:", err.response.data);
+    }
+    res.status(500).json({
+      success: false,
+      error: err.message || "Payment initiation failed",
+    });
+  }
 });
+
+// --------------------------
+// Sunny Webhook
+// --------------------------
+router.post("/webhook", async (req, res) => {
+  try {
+    console.log("🔥 WEBHOOK HIT:", req.body);
+
+    const { event, data } = req.body;
+
+    // Only process successful payments
+    if (
+      event !== "payment.successful" &&
+      event !== "mpesa.stk.push.successful"
+    ) {
+      console.log("❌ Ignoring event:", event);
+      return res.status(200).send("Event ignored");
+    }
+
+    const transactionRef =
+      data.checkout_request_id || data.transaction_id || data.id;
+    const pending = pendingPayments.get(transactionRef);
+
+    if (!pending) {
+      console.warn("⚠ No pending payment found for", transactionRef);
+      return res.status(200).send("Transaction not found");
+    }
+
+    const mpesaReceipt =
+      data.mpesa_receipt || data.receipt_number || data.transaction_id;
+
+    if (!mpesaReceipt) {
+      console.warn("⚠ No receipt found in callback");
+      return res.status(200).send("No receipt found");
+    }
+
+    console.log(`✅ Payment successful: ${mpesaReceipt}`);
+
+    // Add player to Convex DB
+    await convexClient.mutation("players:addPlayer" as any, {
+      userId: pending.userId,
+      name: pending.username,
+      tournamentId: pending.tournamentId,
+      phoneNumber: pending.phone,
+      amount: pending.amount,
+      mpesaReceipt: mpesaReceipt,
+      createdAt: new Date().toISOString(),
+    });
+
+    pendingPayments.delete(transactionRef);
+    res.status(200).json({ success: true, message: "Webhook processed" });
+  } catch (err) {
+    console.error("❌ Webhook processing error:", err);
+    res.status(500).json({ success: false, error: "Webhook failed" });
+  }
+});
+
+// --------------------------
+// Test Endpoint
+// --------------------------
+router.get("/test-sunny", async (req, res) => {
+  try {
+    const response = await axios.get(
+      "https://api.sunnypayments.com/v1/health",
+      {
+        headers: {
+          Authorization: `Bearer ${process.env.SUNNY_SECRET_KEY}`,
+        },
+      },
+    );
+    res.json({
+      success: true,
+      message: "Sunny connected!",
+      data: response.data,
+    });
+  } catch (err: any) {
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+export default router;
