@@ -10,13 +10,12 @@ const CONVEX_URL =
 console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
 const convexClient = new ConvexHttpClient(CONVEX_URL);
 
-// Initialize IntaSend
-// IntaSend constructor expects (publishableKey, secretKey, options?)
-const intasend = new IntaSend(
-  process.env.INTASEND_PUBLISHABLE_KEY || "",
-  process.env.INTASEND_SECRET_KEY || "",
-  { test: process.env.INTASEND_MODE !== "live" },
-);
+// Initialize IntaSend - FIXED: Use the correct constructor
+const intasend = new IntaSend({
+  publishableKey: process.env.INTASEND_PUBLISHABLE_KEY!,
+  secretKey: process.env.INTASEND_SECRET_KEY!,
+  test: process.env.INTASEND_MODE !== 'live',
+});
 
 console.log(
   "📦 IntaSend initialized with mode:",
@@ -155,15 +154,21 @@ router.post("/webhook", async (req, res) => {
 
     console.log(`✅ Payment successful: ${mpesaReceipt}`);
 
-    await convexClient.mutation("players:addPlayer" as any, {
-      userId: pending.userId,
-      name: pending.username,
-      tournamentId: pending.tournamentId,
-      phoneNumber: pending.phone,
-      amount: pending.amount,
-      mpesaReceipt: mpesaReceipt,
-      createdAt: new Date().toISOString(),
-    });
+    // Add player to Convex DB
+    try {
+      await convexClient.mutation("players:addPlayer" as any, {
+        userId: pending.userId,
+        name: pending.username,
+        tournamentId: pending.tournamentId,
+        phoneNumber: pending.phone,
+        amount: pending.amount,
+        mpesaReceipt: mpesaReceipt,
+        createdAt: new Date().toISOString(),
+      });
+      console.log("✅ Player added successfully:", mpesaReceipt);
+    } catch (err) {
+      console.error("❌ Failed to add player to DB:", err);
+    }
 
     pendingPayments.delete(transactionRef);
     res.status(200).json({ success: true, message: "Webhook processed" });
@@ -182,6 +187,7 @@ router.get("/test-intasend", async (req, res) => {
     const result = await wallets.list();
     res.json({ success: true, message: "IntaSend connected!", data: result });
   } catch (err: any) {
+    console.error("❌ Test endpoint error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -199,6 +205,7 @@ router.get("/test-intasend-debug", async (req, res) => {
       data: text.substring(0, 500),
     });
   } catch (err: any) {
+    console.error("❌ Debug error:", err.message);
     res.status(500).json({ success: false, error: err.message });
   }
 });
@@ -241,6 +248,10 @@ router.post("/test-payment", async (req, res) => {
       data: response,
     });
   } catch (err: any) {
+    console.error("❌ Test payment error:", err.message);
+    if (err.response) {
+      console.error("❌ Error response:", err.response.data);
+    }
     res.status(500).json({ success: false, error: err.message });
   }
 });
