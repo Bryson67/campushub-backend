@@ -11,18 +11,39 @@ const CONVEX_URL =
 console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
 const convexClient = new ConvexHttpClient(CONVEX_URL);
 
-// Initialize Daraja SDK
-const mpesa = new Mpesa({
-  consumerKey: process.env.MPESA_CONSUMER_KEY!,
-  consumerSecret: process.env.MPESA_CONSUMER_SECRET!,
-  passkey: process.env.MPESA_PASSKEY!,
-  environment: process.env.NODE_ENV === "production" ? "live" : "sandbox",
-});
-
+// Check environment variables
+console.log("🔍 Checking M-Pesa environment variables:");
 console.log(
-  "📦 M-Pesa initialized with environment:",
-  process.env.NODE_ENV === "production" ? "live" : "sandbox",
+  "  MPESA_CONSUMER_KEY:",
+  process.env.MPESA_CONSUMER_KEY ? "✅ Set" : "❌ Not set",
 );
+console.log(
+  "  MPESA_CONSUMER_SECRET:",
+  process.env.MPESA_CONSUMER_SECRET ? "✅ Set" : "❌ Not set",
+);
+console.log(
+  "  MPESA_SHORTCODE:",
+  process.env.MPESA_SHORTCODE ? "✅ Set" : "❌ Not set",
+);
+console.log(
+  "  MPESA_PASSKEY:",
+  process.env.MPESA_PASSKEY ? "✅ Set" : "❌ Not set",
+);
+
+// Initialize Daraja SDK with proper error handling
+let mpesa: any = null;
+try {
+  mpesa = new Mpesa({
+    consumerKey: process.env.MPESA_CONSUMER_KEY!,
+    consumerSecret: process.env.MPESA_CONSUMER_SECRET!,
+    passkey: process.env.MPESA_PASSKEY!,
+    environment: process.env.NODE_ENV === "production" ? "live" : "sandbox",
+  });
+  console.log("📦 M-Pesa initialized successfully");
+} catch (error) {
+  console.error("❌ Failed to initialize M-Pesa:", error);
+}
+
 console.log("📦 Using Shortcode:", process.env.MPESA_SHORTCODE);
 
 // Map to store pending payments
@@ -47,6 +68,14 @@ const generateReference = () => {
 // --------------------------
 router.post("/pay", async (req, res) => {
   try {
+    // Check if M-Pesa is initialized
+    if (!mpesa) {
+      return res.status(500).json({
+        success: false,
+        error: "M-Pesa service not initialized. Check environment variables.",
+      });
+    }
+
     const { phone, amount, userId, username, tournamentId } = req.body;
 
     if (!phone || !amount || !userId || !username || !tournamentId) {
@@ -182,7 +211,12 @@ router.post("/daraja-webhook", async (req, res) => {
 // --------------------------
 router.get("/test-mpesa", async (req, res) => {
   try {
-    // Test the connection by getting a token
+    if (!mpesa) {
+      return res.status(500).json({
+        success: false,
+        error: "M-Pesa service not initialized",
+      });
+    }
     const token = await mpesa.getAccessToken();
     res.json({
       success: true,
