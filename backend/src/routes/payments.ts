@@ -11,11 +11,13 @@ console.log("🔧 Using CONVEX_URL:", CONVEX_URL);
 const convexClient = new ConvexHttpClient(CONVEX_URL);
 
 // Initialize IntaSend with your credentials
-const intasend = new IntaSend({
-  publishableKey: process.env.INTASEND_PUBLISHABLE_KEY!,
-  secretKey: process.env.INTASEND_SECRET_KEY!,
-  test: process.env.INTASEND_MODE !== "live", // false for live
-});
+const intasend = new IntaSend(
+  process.env.INTASEND_PUBLISHABLE_KEY!,
+  process.env.INTASEND_SECRET_KEY!,
+  {
+    test: process.env.INTASEND_MODE !== "live", // false for live
+  },
+);
 
 console.log(
   "📦 IntaSend initialized with mode:",
@@ -226,7 +228,8 @@ router.get("/status/:transactionId", async (req, res) => {
     // Check transaction status with IntaSend
     try {
       const wallets = intasend.wallets();
-      const status = await wallets.transactionStatus(transactionId);
+      // Use the correct SDK method to fetch transaction details
+      const status = await wallets.transactions(transactionId);
 
       return res.json({
         success: true,
